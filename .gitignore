@@ -1,0 +1,18 @@
+# secrets
+.env
+
+# run artefacts
+data/runs/
+data/cache/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# os
+.DS_Store

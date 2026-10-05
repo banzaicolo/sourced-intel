@@ -1,0 +1,60 @@
+# ---------------------------------------------------------------------------
+# One command brings up the whole system:
+#
+#   cp .env.example .env      # REQUIRED FIRST STEP - then fill in GLM_API_KEY
+#   docker compose up --build
+#
+#   UI    -> http://localhost:8501
+#   API   -> http://localhost:8000/docs
+#
+# The `cp` is not optional. Both services declare `env_file: .env`, so when the
+# file is absent Compose stops before building anything and reports:
+#     env file /path/to/sourced-intel/.env not found
+#
+# Both ports are published on 127.0.0.1 only. The API is unauthenticated and
+# every POST /runs spends real LLM quota, so binding it to 0.0.0.0 would let
+# anyone on the same network drain the account. Publishing it wider is an
+# explicit decision, not a default - see README, "Exposing the API".
+# ---------------------------------------------------------------------------
+services:
+  ui:
+    build:
+      context: .
+      args:
+        # Point this at a nearer mirror if PyPI is slow from your network.
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+    image: sourced-intel:local
+    container_name: sourced-intel-ui
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /app/data
+    ports:
+      - "127.0.0.1:8501:8501"
+    volumes:
+      # Run artefacts (reports, snapshots, traces) survive container restarts.
+      - ./data:/app/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+    image: sourced-intel:local
+    container_name: sourced-intel-api
+    env_file:
+      - .env
+    environment:
+      DATA_DIR: /app/data
+    command:
+      - uvicorn
+      - sourced_intel.api:app
+      - --host=127.0.0.1
+      - --port=8000
+      - --app-dir=src
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

@@ -1,0 +1,28 @@
+# Dependency updates.
+#
+# `requirements.txt` keeps range specifiers on purpose - it is the file a reader
+# runs by hand - so nothing there pins a version. `requirements.lock` is the
+# pinned, hash-carrying artefact, and this is what keeps it current: Dependabot
+# raises a PR, CI runs the offline suite against it, a human merges.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for routine bumps, individual PRs for anything major.
+      python-minor-and-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

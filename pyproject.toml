@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sourced-intel"
+dynamic = ["version"]
+description = "Multi-source industry intelligence mining: one question in, one sourced HTML report out."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Zhenlyu Wang" }]
+keywords = [
+  "llm", "agent", "langgraph", "osint", "rag", "report-generation",
+  "hallucination-mitigation", "intelligence",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "httpx>=0.27,<1.0",
+  "pydantic>=2.7,<3.0",
+  "langgraph>=0.2.20,<0.4.0",
+  "jinja2>=3.1,<4.0",
+]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.115", "uvicorn[standard]>=0.32"]
+ui = ["streamlit>=1.38"]
+dev = ["pytest>=8.3", "ruff>=0.6"]
+all = ["sourced-intel[api,ui,dev]"]
+
+[project.scripts]
+sourced-intel = "sourced_intel.cli:main"
+
+[project.urls]
+Source = "https://github.com/banzaicolo/sourced-intel"
+Issues = "https://github.com/banzaicolo/sourced-intel/issues"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.dynamic]
+version = { attr = "sourced_intel.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+sourced_intel = ["prompts/*.md", "report/templates/*.j2"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests", "scripts"]
+# The code fences in docs/ are illustrations, not code under test: several keep
+# hand-aligned columns to show that two encodings of one value line up. The
+# formatter would collapse those, so it is told to stay out of them.
+extend-exclude = ["docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+  "E501",   # the line limit is enforced by the formatter, not by lint noise
+  "RUF001", # the repo deliberately uses full-width punctuation in Chinese text
+  "RUF002",
+  "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["E402"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+  "slow: requires network access and a live LLM credential (deselect with '-m \"not slow\"')",
+]
+filterwarnings = ["ignore::DeprecationWarning"]

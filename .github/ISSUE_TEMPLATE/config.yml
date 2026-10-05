@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or usage help
+    url: https://github.com/banzaicolo/sourced-intel/discussions
+    about: Ask how to run it, configure a source, or read a number in the report.

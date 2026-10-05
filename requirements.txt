@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+# Sourced Intel runtime dependencies
+#
+# Deliberately small. HTML parsing, geo/map rendering and aggregation are all
+# implemented on the standard library (see src/sourced_intel/parsing.py and
+# src/sourced_intel/tools/htmlparse.py), so there is no BeautifulSoup, pandas or
+# folium requirement.
+# ---------------------------------------------------------------------------
+
+# HTTP (async-capable client, one shared timeout/retry policy)
+httpx>=0.27,<1.0
+
+# Schema validation for both internal state and LLM structured output
+pydantic>=2.7,<3.0
+
+# Workflow orchestration (explicitly requested by the job description)
+langgraph>=0.2.20,<0.4.0
+
+# Single-file HTML report templating
+jinja2>=3.1,<4.0
+
+# Demo UI
+streamlit>=1.38
+
+# Productisation path: REST API
+fastapi>=0.115
+uvicorn[standard]>=0.32
+
+# Tests (the parsing tests also run on the bare stdlib via unittest)
+pytest>=8.3
