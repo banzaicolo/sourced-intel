@@ -45,7 +45,7 @@ python3 scripts/preflight.py       # checks the key, the config and every source
 cp .env.example .env               # then set GLM_API_KEY
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e .                   # gives you the `sourced-intel` command
-sourced-intel run "深圳最近三个月的储能产业动态"
+sourced-intel run "Beijing semiconductor industry developments over the past six months"
 ```
 
 <details>
@@ -242,7 +242,7 @@ pip install -e ".[ui,api]"
 cp .env.example .env                         # then set GLM_API_KEY
 
 python3 scripts/demo.py                      # render the sample report (no key needed)
-sourced-intel run "深圳最近三个月的储能产业动态"   # a real run
+sourced-intel run "Beijing semiconductor industry developments over the past six months"   # a real run
 sourced-intel stats                            # summarise the runs you have made
 ```
 
