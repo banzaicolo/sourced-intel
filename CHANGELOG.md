@@ -21,9 +21,26 @@ changes what a run can be made to do.
   Covered by `tests/test_run_id_safety.py`.
 - **Docker no longer publishes the API to the network.** Both services bind `127.0.0.1`,
   so `POST /runs` - unauthenticated and billed against a real LLM account - is not
-  reachable from the LAN. Exposing it is a deliberate edit; see README, "Exposing the API".
+  reachable from the LAN. Exposing it is a deliberate edit; see README, "Exposing the API",
+  and set `SOURCED_INTEL_API_TOKEN` when you do.
 - **`GET /health` no longer echoes the API key's last four characters.** The dict reports
   `set`/`unset`; local diagnostics that want a mask call `llm_keys.masked_key()`.
+- **LangGraph 0.3.34 → 1.2.16.** `pip-audit` reported eight advisories across
+  langchain-core, langgraph, langgraph-checkpoint and langgraph-sdk. The 1.x line clears
+  all of them; the offline suite passes unchanged on Python 3.10 and 3.12.
+
+### Added
+
+- **Optional bearer-token auth and a run cap for the REST API.** With
+  `SOURCED_INTEL_API_TOKEN` set, every route except `/health` requires
+  `Authorization: Bearer <token>` and answers `401` otherwise (constant-time compare).
+  `POST /runs` admits at most `MAX_CONCURRENT_RUNS` executions (default `1`) and answers
+  `429` with `Retry-After` beyond that. The permit is released on the success and the
+  crash path, so a failing run cannot brick the service. Covered by
+  `tests/test_api_guardrails.py`.
+- **`requirements.lock`**, a universal, hash-carrying lock compiled at the Python 3.10
+  floor. CI installs from it with `--require-hashes`; `make lock` regenerates it. The
+  same file installs on 3.10 and 3.12 and runs the full offline suite from a clean env.
 
 ### Fixed
 

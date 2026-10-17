@@ -12,7 +12,7 @@ at a real document, and every failure is printed rather than hidden.
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%20%7C%203.12-blue.svg)](#quickstart)
 [![Runtime deps: 4](https://img.shields.io/badge/runtime%20deps-4-brightgreen.svg)](pyproject.toml)
-[![Offline tests: 287](https://img.shields.io/badge/offline%20tests-287-brightgreen.svg)](#testing)
+[![Offline tests: 296](https://img.shields.io/badge/offline%20tests-296-brightgreen.svg)](#testing)
 [![Reports offline](https://img.shields.io/badge/report%20renders-offline-brightgreen.svg)](#the-report)
 
 <br />
@@ -184,7 +184,7 @@ entries, each one something that was actually observed rather than imagined:
 ### Testing
 
 ```bash
-pytest tests/ -m "not slow" -q     # 287 tests, ~2 s, no network, no credential
+pytest tests/ -m "not slow" -q     # 296 tests, ~2 s, no network, no credential
 python3 -m unittest discover -s tests -p "test_parsing.py"   # 58 tests, stdlib only
 ```
 
@@ -193,11 +193,15 @@ The suite is split deliberately:
 - **Zero-install.** The parsing layer, the amount/date reconciliation and the source
   adapters are tested with `unittest` and the standard library alone. CI runs this in a job
   that installs *nothing* — if the claim ever stops being true, that job fails.
-- **Offline.** 287 tests covering the pipeline nodes with a stubbed provider, the report
+- **Offline.** 296 tests covering the pipeline nodes with a stubbed provider, the report
   contract (section numbering, citation registry, date precision, HTML escaping), the
   demo fixture's internal consistency and the CLI.
 - **`slow`.** One live end-to-end run against the real API, excluded from CI by an explicit
   marker so a new unmarked test fails loudly instead of being silently skipped.
+
+Dependencies are pinned too. `requirements.lock` is a universal, hash-carrying lock
+(`make lock` regenerates it at the 3.10 floor), CI installs from it with
+`--require-hashes`, and `pip-audit` runs against it in the lint job.
 
 ### Reproducing the performance numbers
 
@@ -262,19 +266,27 @@ data/runs/run-20260918-.../
 ### Exposing the API
 
 Both ports in `docker-compose.yml` are published on `127.0.0.1`, and `sourced-intel api`
-defaults to `--host 127.0.0.1`. That default is deliberate: the API has **no
-authentication**, and every `POST /runs` spends real LLM quota, so binding it to `0.0.0.0`
-would let anyone on the same network drain the account with one loop. The same applies to
-the Streamlit UI, which calls the pipeline directly.
+defaults to `--host 127.0.0.1`. That default is deliberate: every `POST /runs` spends real
+LLM quota, so binding to `0.0.0.0` would let anyone on the same network drain the account
+with one loop. The Streamlit UI calls the pipeline directly and has the same property.
 
-If you do want it reachable from another machine, the port binding is the easy part and the
-rest is on you: put an authenticating reverse proxy in front of it, add rate limiting and a
-concurrency ceiling, and cap spend at the provider. Run ids are validated against
-`run-[A-Za-z0-9][A-Za-z0-9._-]*` and confined to `data/runs`, so a caller cannot use one to
-write outside it - but that is the only hardening the service currently ships with.
+If you do need it reachable from another machine, the service ships two guardrails:
 
-`GET /health` reports the configuration with the API key as `set`/`unset` only. It is safe
-to expose; the rest of the API is not.
+```bash
+export SOURCED_INTEL_API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export MAX_CONCURRENT_RUNS=1
+sourced-intel api --host 127.0.0.1     # then put a TLS reverse proxy in front
+```
+
+- With `SOURCED_INTEL_API_TOKEN` set, every route except `/health` requires
+  `Authorization: Bearer <token>` and answers `401` otherwise.
+- `POST /runs` admits at most `MAX_CONCURRENT_RUNS` executions (default `1`) and answers
+  `429` with `Retry-After` beyond that.
+- Run ids are validated against `run-[A-Za-z0-9][A-Za-z0-9._-]*` and confined to
+  `data/runs`, so a caller cannot use one to write outside it.
+
+Still missing for a genuinely public deployment: per-client rate limiting, a spend cap at
+the provider, and TLS. `GET /health` is open and reports the GLM key as `set`/`unset` only.
 
 ---
 

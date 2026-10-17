@@ -11,7 +11,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%20%7C%203.12-blue.svg)](#快速开始)
 [![运行时依赖: 4](https://img.shields.io/badge/runtime%20deps-4-brightgreen.svg)](pyproject.toml)
-[![离线测试: 287](https://img.shields.io/badge/offline%20tests-287-brightgreen.svg)](#测试)
+[![离线测试: 296](https://img.shields.io/badge/offline%20tests-296-brightgreen.svg)](#测试)
 [![报告离线可渲染](https://img.shields.io/badge/report%20renders-offline-brightgreen.svg)](#报告)
 
 <br />
@@ -159,7 +159,7 @@ sourced-intel run "深圳最近三个月的储能产业动态"
 ### 测试
 
 ```bash
-pytest tests/ -m "not slow" -q     # 287 个测试,~2 秒,无网络、无凭证
+pytest tests/ -m "not slow" -q     # 296 个测试,~2 秒,无网络、无凭证
 python3 -m unittest discover -s tests -p "test_parsing.py"   # 58 个测试,纯标准库
 ```
 
@@ -167,10 +167,35 @@ python3 -m unittest discover -s tests -p "test_parsing.py"   # 58 个测试,纯�
 
 - **零安装。** 解析层、金额/日期对账、来源适配器,只用 `unittest` 和标准库测。CI 用一个
   什么都不装的 job 跑它——一旦「零安装」这个说法不成立,那个 job 就失败。
-- **离线。** 287 个测试,覆盖带桩 provider 的流水线节点、报告契约(章节编号、引用注册表、
+- **离线。** 296 个测试,覆盖带桩 provider 的流水线节点、报告契约(章节编号、引用注册表、
   日期精度、HTML 转义)、demo 数据集的内部一致性、CLI。
 - **`slow`。** 一次针对真实 API 的端到端运行,用显式标记排除在 CI 之外,这样新加的
   「忘了打标记」的测试会响亮地失败,而不是被悄悄跳过。
+
+依赖同样固定:`requirements.lock` 是跨平台的哈希锁(`make lock` 以 3.10 为下限重新生成),
+CI 用 `--require-hashes` 安装,并在 lint job 里跑 `pip-audit`。
+
+### 对外暴露 API
+
+`docker-compose.yml` 的两个端口和 `sourced-intel api` 的默认 host 都只绑 `127.0.0.1`:
+每次 `POST /runs` 都消耗真实的 LLM 配额,绑到 `0.0.0.0` 等于让同网段任何人都能刷爆账单。
+
+确实需要远程访问时,服务自带两道闸:
+
+```bash
+export SOURCED_INTEL_API_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export MAX_CONCURRENT_RUNS=1
+sourced-intel api --host 127.0.0.1     # 前面再放一层 TLS 反向代理
+```
+
+- 设置了 `SOURCED_INTEL_API_TOKEN` 后,除 `/health` 外的所有路由都要求
+  `Authorization: Bearer <token>`,否则返回 `401`。
+- `POST /runs` 最多同时执行 `MAX_CONCURRENT_RUNS` 个(默认 `1`),超出返回 `429` 并带
+  `Retry-After`。
+- `run_id` 只允许 `run-[A-Za-z0-9][A-Za-z0-9._-]*`,并被限制在 `data/runs` 内。
+
+真正公开部署仍缺:按客户端限流、供应商侧的消费上限、TLS。`/health` 可以公开,它只报告
+GLM key 是 `set` 还是 `unset`。
 
 ### 复现性能数字
 

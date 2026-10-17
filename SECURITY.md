@@ -4,7 +4,7 @@
 
 If you discover a security vulnerability, please do **not** open a public issue. Report it privately instead:
 
-- Use GitHub's private vulnerability reporting: `https://github.com/<your-username>/<repo>/security/advisories/new` (recommended), or
+- Use GitHub's private vulnerability reporting: <https://github.com/banzaicolo/sourced-intel/security/advisories/new> (recommended), or
 - Contact the maintainers directly.
 
 Please include enough detail to reproduce the issue and the affected version(s). We aim to acknowledge reports within a few days and fix confirmed issues as soon as possible.
@@ -19,4 +19,5 @@ Please include enough detail to reproduce the issue and the affected version(s).
 
 - Never commit a real API key. Copy `.env.example` to `.env` and fill in your own `GLM_API_KEY`.
 - `.env` is git-ignored — do not force-add it.
-- The REST API is unauthenticated and every `POST /runs` spends real LLM quota. Keep it bound to `127.0.0.1` unless you have explicitly decided to expose it.
+- Every `POST /runs` spends real LLM quota, and the REST API has no default authentication. Keep it bound to `127.0.0.1` unless you have explicitly decided to expose it.
+- If you do expose it, set `SOURCED_INTEL_API_TOKEN` (all routes except `/health` then require `Authorization: Bearer <token>`) and keep `MAX_CONCURRENT_RUNS` low so a loop cannot multiply the bill.

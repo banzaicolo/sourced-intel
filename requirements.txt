@@ -13,8 +13,9 @@ httpx>=0.27,<1.0
 # Schema validation for both internal state and LLM structured output
 pydantic>=2.7,<3.0
 
-# Workflow orchestration (explicitly requested by the job description)
-langgraph>=0.2.20,<0.4.0
+# Workflow orchestration (explicitly requested by the job description).
+# 1.x is the line with the 2026 advisories fixed; 0.3.x is not.
+langgraph>=1.2.16,<2.0
 
 # Single-file HTML report templating
 jinja2>=3.1,<4.0

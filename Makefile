@@ -9,6 +9,7 @@
 #   make test-offline  everything that needs no network and no credential
 #   make test-all   full suite including the live end-to-end run
 #   make lint       ruff check + ruff format --check (install with: pip install ruff)
+#   make lock       regenerate requirements.lock (needs uv)
 #   make ui         start the Streamlit demo
 #   make api        start the FastAPI service
 #   make docker     build and start everything with docker compose
@@ -17,8 +18,9 @@
 PYTHON ?= python3
 VENV   ?= .venv
 BIN     = $(VENV)/bin
+UV     ?= uv
 
-.PHONY: help demo preflight rehearse venv check test test-offline test-all lint ui api docker docker-down clean tree
+.PHONY: help demo preflight rehearse venv check test test-offline test-all lint lock ui api docker docker-down clean tree
 
 help:
 	@grep -E '^#   ' Makefile | sed 's/^#   //'
@@ -66,6 +68,12 @@ test-all:
 lint:
 	ruff check .
 	ruff format --check .
+
+# Universal + hashes: one file works on every supported Python and OS. Compiled
+# at the floor version (3.10) so the result cannot quietly require 3.11.
+lock:
+	$(UV) pip compile pyproject.toml --all-extras --universal --python-version 3.10 \
+		--generate-hashes -o requirements.lock
 
 ui:
 	$(BIN)/streamlit run app/streamlit_app.py

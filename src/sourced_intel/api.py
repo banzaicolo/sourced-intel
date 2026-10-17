@@ -9,15 +9,22 @@ Endpoints:
     GET  /runs/{run_id}             run summary from disk
     GET  /runs/{run_id}/report      the rendered report
     GET  /runs/{run_id}/trace       per-node trace records
+
+Every route except /health requires `Authorization: Bearer <SOURCED_INTEL_API_TOKEN>`
+when that variable is set. `POST /runs` additionally admits at most
+`MAX_CONCURRENT_RUNS` executions at a time (default 1) and answers 429 beyond it.
+With no token set, the gate is open - which is why the default bind is loopback.
 """
 
 from __future__ import annotations
 
+import hmac
 import json
 import sys
+import threading
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 
@@ -51,6 +58,44 @@ class RunRequest(BaseModel):
     )
 
 
+#: One permit per allowed concurrent run. `POST /runs` is synchronous, so
+#: without this an exposed service turns every caller into a paid worker.
+_slots_lock = threading.Lock()
+_run_slots: threading.BoundedSemaphore | None = None
+_run_slots_size = 0
+
+
+def _slot_pool() -> threading.BoundedSemaphore:
+    """The run semaphore, rebuilt if `MAX_CONCURRENT_RUNS` changed."""
+    global _run_slots, _run_slots_size
+    size = max(1, get_settings().max_concurrent_runs)
+    with _slots_lock:
+        if _run_slots is None or _run_slots_size != size:
+            _run_slots = threading.BoundedSemaphore(size)
+            _run_slots_size = size
+        return _run_slots
+
+
+def require_api_token(authorization: str | None = Header(default=None)) -> None:
+    """Bearer-token gate; disabled when no token is configured.
+
+    The comparison is constant-time and byte-wise: a caller must not be able to
+    learn the token from response timing, and a non-ASCII guess must not turn
+    into a 500 from `compare_digest`.
+    """
+    expected = get_settings().api_token
+    if not expected:
+        return
+    scheme, _, presented = (authorization or "").partition(" ")
+    supplied = presented.strip().encode("utf-8")
+    if scheme.lower() != "bearer" or not hmac.compare_digest(supplied, expected.encode("utf-8")):
+        raise HTTPException(
+            status_code=401,
+            detail="missing or invalid bearer token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
 def _validated_run_id(run_id: str) -> str:
     """Turn a caller-supplied run id into a 400 instead of a filesystem lookup."""
     try:
@@ -65,13 +110,26 @@ def health() -> dict:
     return {"status": "ok", "config": settings.redacted()}
 
 
-@app.post("/runs")
+@app.post("/runs", dependencies=[Depends(require_api_token)])
 def create_run(payload: RunRequest) -> JSONResponse:
     run_id = _validated_run_id(payload.run_id) if payload.run_id is not None else None
+    slots = _slot_pool()
+    if not slots.acquire(blocking=False):
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"{get_settings().max_concurrent_runs} run(s) already in flight; "
+                "retry when one finishes"
+            ),
+            headers={"Retry-After": "30"},
+        )
     try:
-        result = run_pipeline(payload.query, run_id=run_id)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}") from exc
+        try:
+            result = run_pipeline(payload.query, run_id=run_id)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}") from exc
+    finally:
+        slots.release()
 
     summary = result["summary"]
     return JSONResponse(
@@ -89,7 +147,7 @@ def create_run(payload: RunRequest) -> JSONResponse:
     )
 
 
-@app.get("/runs/{run_id}")
+@app.get("/runs/{run_id}", dependencies=[Depends(require_api_token)])
 def get_run(run_id: str) -> dict:
     run_id = _validated_run_id(run_id)
     settings = get_settings()
@@ -111,7 +169,7 @@ def get_run(run_id: str) -> dict:
     }
 
 
-@app.get("/runs/{run_id}/report")
+@app.get("/runs/{run_id}/report", dependencies=[Depends(require_api_token)])
 def get_report(run_id: str):
     run_id = _validated_run_id(run_id)
     settings = get_settings()
@@ -125,7 +183,7 @@ def get_report(run_id: str):
     raise HTTPException(status_code=404, detail=f"no report for run {run_id}")
 
 
-@app.get("/runs/{run_id}/trace")
+@app.get("/runs/{run_id}/trace", dependencies=[Depends(require_api_token)])
 def get_trace(run_id: str) -> dict:
     run_id = _validated_run_id(run_id)
     settings = get_settings()

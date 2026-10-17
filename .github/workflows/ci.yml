@@ -39,10 +39,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - name: Install
+      # The lock is universal (Python 3.10+ / Linux / macOS / Windows) and
+      # hash-carrying, so both matrix entries install the same verified bytes.
+      - name: Install (locked, hash-verified)
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install --require-hashes -r requirements.lock
+          pip install -e . --no-deps
       # The offline suite. The live end-to-end test is marked `slow` and needs a
       # Zhipu credential, so it is excluded here on purpose rather than skipped
       # silently - `-m "not slow"` fails loudly if a new test forgets its marker.
@@ -67,6 +70,10 @@ jobs:
       - run: ruff check .
       - name: Formatting is part of the style contract
         run: ruff format --check .
+      - name: Dependency audit
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.lock --progress-spinner off
 
   demo:
     name: Render the sample report

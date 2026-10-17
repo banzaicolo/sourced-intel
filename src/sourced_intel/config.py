@@ -110,6 +110,14 @@ class Settings:
     gdelt_failure_ttl: float = 600.0
     max_map_points: int = 200
 
+    # --- REST API guardrails ------------------------------------------------
+    # Empty means "no authentication". That is only acceptable because the
+    # server binds 127.0.0.1; set this before exposing the API anywhere else.
+    api_token: str = ""
+    # How many POST /runs may execute at once. Each run spends real LLM quota,
+    # so this is the cost ceiling and the concurrency ceiling at the same time.
+    max_concurrent_runs: int = 1
+
     data_dir: Path = field(default_factory=lambda: PROJECT_ROOT / "data")
 
     @classmethod
@@ -140,6 +148,8 @@ class Settings:
             gdelt_timeout=_env_float("GDELT_TIMEOUT_SECONDS", 4.0),
             gdelt_failure_ttl=_env_float("GDELT_FAILURE_TTL_SECONDS", 600.0),
             max_map_points=_env_int("MAX_MAP_POINTS", 200),
+            api_token=_env("SOURCED_INTEL_API_TOKEN"),
+            max_concurrent_runs=max(1, _env_int("MAX_CONCURRENT_RUNS", 1)),
             data_dir=path,
         )
 
@@ -194,6 +204,8 @@ class Settings:
             "confidence_threshold": self.confidence_threshold,
             "gdelt_min_interval": self.gdelt_min_interval,
             "gdelt_timeout": self.gdelt_timeout,
+            "api_auth": "bearer" if self.api_token else "none",
+            "max_concurrent_runs": self.max_concurrent_runs,
             "data_dir": str(self.data_dir),
         }
 
